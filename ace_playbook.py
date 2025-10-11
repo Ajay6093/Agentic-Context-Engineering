@@ -116,18 +116,42 @@ def build_playbook_block(topk: List[Dict]) -> str:
     lines = "\n".join(f"- {b.get('content','')}" for b in topk)
     return f"### ACE Playbook (Top-K)\n{lines}\n"
 
-def generator(user_query: str, topk: List[Dict]) -> Dict:
+def generator(user_query: str, topk: List[Dict], conversation_history: Optional[List[Dict]] = None) -> Dict:
+    """
+    Generate a response using the playbook and conversation history.
+    
+    Args:
+        user_query: The current user query
+        topk: Top-K bullets from playbook
+        conversation_history: List of previous messages [{"role": "user/assistant", "content": "..."}]
+    """
     system_msg = (
         "You are the GENERATOR.\n"
         "Use the ACE Playbook if relevant.\n"
+        "Maintain conversation context and refer to previous messages when appropriate.\n"
         "Return JSON with keys: answer (string), trace (array of steps)."
     )
     ctx = build_playbook_block(topk)
+    
     llm_gen = _get_llm_gen()  # Get LLM instance only when needed
-    res = llm_gen.invoke([
-        ("system", system_msg + "\n\n" + ctx),
-        ("user", f"Task: {user_query}\nReturn JSON only.")
-    ]).content
+    
+    # Build message history
+    messages = [("system", system_msg + "\n\n" + ctx)]
+    
+    # Add conversation history if available
+    if conversation_history:
+        for msg in conversation_history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "user":
+                messages.append(("user", content))
+            elif role == "assistant":
+                messages.append(("assistant", content))
+    
+    # Add current query
+    messages.append(("user", f"Task: {user_query}\nReturn JSON only."))
+    
+    res = llm_gen.invoke(messages).content
     return json.loads(res)
 
 def reflector(user_query: str, answer: str, trace: List[str]) -> List[Dict]:

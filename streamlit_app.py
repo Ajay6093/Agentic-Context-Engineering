@@ -67,24 +67,31 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "🎯 Context Preview", "�
 with tab1:
     st.subheader("💬 Continuous Chat")
     
-    # Display chat history
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-            if "metadata" in msg and msg["metadata"]:
-                with st.expander("🔍 View Details"):
-                    if "topk" in msg["metadata"]:
-                        st.caption("**Top-K Bullets Used:**")
-                        st.code(build_playbook_block(msg["metadata"]["topk"]) or "(none)", language="markdown")
-                    if "trace" in msg["metadata"]:
-                        st.caption("**Trace:**")
-                        st.json(msg["metadata"]["trace"])
-                    if "bullets" in msg["metadata"]:
-                        st.caption("**New Bullets Extracted:**")
-                        st.json(msg["metadata"]["bullets"])
+    # Create a container for chat messages with a fixed height
+    chat_container = st.container()
     
-    # Chat input
-    if prompt := st.chat_input("Ask a question or give a task..."):
+    # Chat input at the bottom
+    prompt = st.chat_input("Ask a question or give a task...")
+    
+    # Display chat history in the container
+    with chat_container:
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                if "metadata" in msg and msg["metadata"]:
+                    with st.expander("🔍 View Details"):
+                        if "topk" in msg["metadata"]:
+                            st.caption("**Top-K Bullets Used:**")
+                            st.code(build_playbook_block(msg["metadata"]["topk"]) or "(none)", language="markdown")
+                        if "trace" in msg["metadata"]:
+                            st.caption("**Trace:**")
+                            st.json(msg["metadata"]["trace"])
+                        if "bullets" in msg["metadata"]:
+                            st.caption("**New Bullets Extracted:**")
+                            st.json(msg["metadata"]["bullets"])
+    
+    # Process the prompt if submitted
+    if prompt:
         # Check if API key is set
         if not st.session_state.api_key and not os.environ.get("OPENAI_API_KEY"):
             st.error("❌ Please enter your OpenAI API key in the sidebar first!")
@@ -93,72 +100,62 @@ with tab1:
         # Add user message to chat
         st.session_state.messages.append({"role": "user", "content": prompt})
         
-        # Display user message
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        
         # Process with ACE
-        with st.chat_message("assistant"):
-            with st.spinner("🧠 Thinking..."):
-                try:
-                    # Retrieve Top-K
-                    topk = retriever_topk(k=k, mode=retrieval_mode, query=query_for_faiss or prompt)
-                    
-                    # Generate
-                    g = generator(prompt, topk)
-                    answer = g.get("answer", "")
-                    trace = g.get("trace", [])
-                    
-                    # Display answer
-                    st.markdown(answer)
-                    
-                    # Reflect and extract bullets
-                    bullets = reflector(prompt, answer, trace)
-                    
-                    # Curate/merge into playbook
-                    updated_topk = merge_deltas(bullets)
-                    
-                    # Store metadata
-                    metadata = {
-                        "topk": topk,
-                        "trace": trace,
-                        "bullets": bullets,
-                        "updated_topk": updated_topk
-                    }
-                    
-                    # Show expandable details
-                    with st.expander("🔍 View Details"):
-                        st.caption("**Top-K Bullets Used:**")
-                        st.code(build_playbook_block(topk) or "(none)", language="markdown")
-                        st.caption("**Trace:**")
-                        st.json(trace)
-                        st.caption("**New Bullets Extracted:**")
-                        st.json(bullets)
-                        if bullets:
-                            st.success(f"✅ Added {len(bullets)} new bullet(s) to playbook!")
-                    
-                    # Add assistant message to chat
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": answer,
-                        "metadata": metadata
-                    })
-                    
-                    # Track playbook growth
-                    st.session_state.playbook_history.append({
-                        "turn": len(st.session_state.messages) // 2,
-                        "bullets_added": len(bullets),
-                        "total_bullets": len(load_all_bullets())
-                    })
-                    
-                except Exception as e:
-                    error_msg = f"❌ Error: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": error_msg,
-                        "metadata": {}
-                    })
+        with st.spinner("🧠 Thinking..."):
+            try:
+                # Retrieve Top-K
+                topk = retriever_topk(k=k, mode=retrieval_mode, query=query_for_faiss or prompt)
+                
+                # Prepare conversation history (exclude metadata for cleaner context)
+                conversation_history = [
+                    {"role": msg["role"], "content": msg["content"]} 
+                    for msg in st.session_state.messages[:-1]  # Exclude the current message we just added
+                ]
+                
+                # Generate with conversation context
+                g = generator(prompt, topk, conversation_history=conversation_history)
+                answer = g.get("answer", "")
+                trace = g.get("trace", [])
+                
+                # Reflect and extract bullets
+                bullets = reflector(prompt, answer, trace)
+                
+                # Curate/merge into playbook
+                updated_topk = merge_deltas(bullets)
+                
+                # Store metadata
+                metadata = {
+                    "topk": topk,
+                    "trace": trace,
+                    "bullets": bullets,
+                    "updated_topk": updated_topk
+                }
+                
+                # Add assistant message to chat
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": answer,
+                    "metadata": metadata
+                })
+                
+                # Track playbook growth
+                st.session_state.playbook_history.append({
+                    "turn": len(st.session_state.messages) // 2,
+                    "bullets_added": len(bullets),
+                    "total_bullets": len(load_all_bullets())
+                })
+                
+                # Rerun to display the new messages
+                st.rerun()
+                
+            except Exception as e:
+                error_msg = f"❌ Error: {str(e)}"
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": error_msg,
+                    "metadata": {}
+                })
+                st.rerun()
     
     # Show quick stats
     if st.session_state.messages:
