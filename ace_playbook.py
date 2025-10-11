@@ -126,10 +126,17 @@ def generator(user_query: str, topk: List[Dict], conversation_history: Optional[
         conversation_history: List of previous messages [{"role": "user/assistant", "content": "..."}]
     """
     system_msg = (
-        "You are the GENERATOR.\n"
+        "You are the GENERATOR - an AI assistant that helps users with their tasks.\n"
         "Use the ACE Playbook if relevant.\n"
-        "Maintain conversation context and refer to previous messages when appropriate.\n"
-        "Return JSON with keys: answer (string), trace (array of steps)."
+        "Maintain conversation context and refer to previous messages when appropriate.\n\n"
+        "IMPORTANT: You MUST respond ONLY with valid JSON in this exact format:\n"
+        "{\n"
+        '  "answer": "your helpful response here as a string",\n'
+        '  "trace": ["step 1", "step 2", "step 3"]\n'
+        "}\n\n"
+        "Do not include any text before or after the JSON.\n"
+        "The answer field must be a string, even for numerical results.\n"
+        "Example for math: {\"answer\": \"The result is 42\", \"trace\": [\"Added 15 + 27\"]}"
     )
     ctx = build_playbook_block(topk)
     
@@ -146,24 +153,76 @@ def generator(user_query: str, topk: List[Dict], conversation_history: Optional[
             if role == "user":
                 messages.append(("user", content))
             elif role == "assistant":
+                # For assistant messages, only include the text content, not the original JSON
                 messages.append(("assistant", content))
     
     # Add current query
-    messages.append(("user", f"Task: {user_query}\nReturn JSON only."))
+    messages.append(("user", user_query))
     
     res = llm_gen.invoke(messages).content
-    return json.loads(res)
+    
+    # Clean up response - remove markdown code blocks if present
+    res = res.strip()
+    if res.startswith("```json"):
+        res = res[7:]
+    if res.startswith("```"):
+        res = res[3:]
+    if res.endswith("```"):
+        res = res[:-3]
+    res = res.strip()
+    
+    try:
+        parsed = json.loads(res)
+        # Ensure answer is always a string
+        if "answer" in parsed and not isinstance(parsed["answer"], str):
+            parsed["answer"] = str(parsed["answer"])
+        # Ensure trace exists
+        if "trace" not in parsed:
+            parsed["trace"] = []
+        return parsed
+    except json.JSONDecodeError as e:
+        # Fallback: wrap the response if it's not valid JSON
+        return {
+            "answer": res,
+            "trace": [f"Raw response (JSON parse failed): {str(e)}"]
+        }
 
 def reflector(user_query: str, answer: str, trace: List[str]) -> List[Dict]:
+    """Extract learnings from the conversation turn into playbook bullets."""
     system_msg = (
         "You are the REFLECTOR.\n"
-        "Extract 2–6 concise, reusable bullets (strategy/pitfall/guardrail).\n"
-        "Return JSON: {\"bullets\":[{\"content\":\"...\",\"tags\":[\"...\"],\"vote\":\"helpful|harmful\"}]}"
+        "Extract 2–6 concise, reusable bullets (strategy/pitfall/guardrail).\n\n"
+        "IMPORTANT: You MUST respond ONLY with valid JSON in this exact format:\n"
+        "{\n"
+        '  "bullets": [\n'
+        '    {"content": "bullet text here", "tags": ["tag1", "tag2"], "vote": "helpful"},\n'
+        '    {"content": "another bullet", "tags": ["tag3"], "vote": "harmful"}\n'
+        "  ]\n"
+        "}\n\n"
+        'vote must be either "helpful" or "harmful".\n'
+        "Do not include any text before or after the JSON."
     )
     payload = json.dumps({"query": user_query, "answer": answer, "trace": trace}, indent=2)
     llm_ref = _get_llm_ref()  # Get LLM instance only when needed
     res = llm_ref.invoke([("system", system_msg), ("user", payload)]).content
-    return json.loads(res).get("bullets", [])
+    
+    # Clean up response - remove markdown code blocks if present
+    res = res.strip()
+    if res.startswith("```json"):
+        res = res[7:]
+    if res.startswith("```"):
+        res = res[3:]
+    if res.endswith("```"):
+        res = res[:-3]
+    res = res.strip()
+    
+    try:
+        parsed = json.loads(res)
+        return parsed.get("bullets", [])
+    except json.JSONDecodeError as e:
+        # Fallback: return empty bullets if parsing fails
+        print(f"Reflector JSON parse error: {e}")
+        return []
 
 def retriever_topk(k: int = 8, mode: str = "score", query: Optional[str] = None) -> List[Dict]:
     if mode == "faiss":
