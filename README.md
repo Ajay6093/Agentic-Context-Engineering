@@ -1,5 +1,5 @@
 
-# ACE Context Demo — Continuous Chat with Playbook
+# Agentic Context Engineering Context Demo — Continuous Chat with Playbook
 
 This demo shows a **continuous chat interface** with an **ACE** (Adaptive Context Engine) loop that builds a JSONL Playbook dynamically as you interact with it. Features include:
 - 💬 **Continuous chat** with conversation history

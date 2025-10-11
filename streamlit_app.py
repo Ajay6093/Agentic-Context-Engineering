@@ -3,12 +3,6 @@ import streamlit as st
 import json, os
 import matplotlib.pyplot as plt
 
-from ace_playbook import (
-    retriever_topk, generator, reflector, merge_deltas,
-    build_playbook_block, get_topk_by_score,
-    load_all_bullets, score, bullets_by_tag, daily_counts
-)
-
 st.set_page_config(page_title="ACE Context Demo", page_icon="🧠", layout="wide")
 
 # Initialize session state for chat history
@@ -36,6 +30,13 @@ if api_key_input:
     st.sidebar.success("✅ API Key set!")
 elif not os.environ.get("OPENAI_API_KEY"):
     st.sidebar.warning("⚠️ Please enter your OpenAI API key to use the app.")
+
+# Import ace_playbook after API key is potentially set
+from ace_playbook import (
+    retriever_topk, generator, reflector, merge_deltas,
+    build_playbook_block, get_topk_by_score,
+    load_all_bullets, score, bullets_by_tag, daily_counts
+)
 
 st.sidebar.markdown("---")
 st.sidebar.header("Settings")

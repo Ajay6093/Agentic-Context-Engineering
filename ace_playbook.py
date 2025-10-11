@@ -93,8 +93,23 @@ def _faiss_topk(k: int = 8, query: Optional[str] = None) -> List[Dict]:
     return out
 
 # -------- LLM roles (Generator & Reflector) --------
-llm_gen = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
-llm_ref = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
+# Lazy initialization to allow API key to be set at runtime
+_llm_gen = None
+_llm_ref = None
+
+def _get_llm_gen():
+    """Lazy initialization of Generator LLM"""
+    global _llm_gen
+    if _llm_gen is None:
+        _llm_gen = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    return _llm_gen
+
+def _get_llm_ref():
+    """Lazy initialization of Reflector LLM"""
+    global _llm_ref
+    if _llm_ref is None:
+        _llm_ref = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    return _llm_ref
 
 def build_playbook_block(topk: List[Dict]) -> str:
     if not topk: return ""
@@ -108,6 +123,7 @@ def generator(user_query: str, topk: List[Dict]) -> Dict:
         "Return JSON with keys: answer (string), trace (array of steps)."
     )
     ctx = build_playbook_block(topk)
+    llm_gen = _get_llm_gen()  # Get LLM instance only when needed
     res = llm_gen.invoke([
         ("system", system_msg + "\n\n" + ctx),
         ("user", f"Task: {user_query}\nReturn JSON only.")
@@ -121,6 +137,7 @@ def reflector(user_query: str, answer: str, trace: List[str]) -> List[Dict]:
         "Return JSON: {\"bullets\":[{\"content\":\"...\",\"tags\":[\"...\"],\"vote\":\"helpful|harmful\"}]}"
     )
     payload = json.dumps({"query": user_query, "answer": answer, "trace": trace}, indent=2)
+    llm_ref = _get_llm_ref()  # Get LLM instance only when needed
     res = llm_ref.invoke([("system", system_msg), ("user", payload)]).content
     return json.loads(res).get("bullets", [])
 
