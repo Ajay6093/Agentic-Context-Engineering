@@ -242,10 +242,12 @@ with tab1:
                 # ============================================================
                 # STEP 1: RETRIEVE - Get relevant bullets from playbook
                 # ============================================================
+                # Pass user's API key for FAISS mode (semantic search)
                 topk = retriever_topk(
                     k=k,
                     mode=retrieval_mode,
-                    query=query_for_faiss or prompt
+                    query=query_for_faiss or prompt,
+                    api_key=st.session_state.api_key if retrieval_mode == "faiss" else None
                 )
                 
                 # ============================================================
@@ -262,9 +264,11 @@ with tab1:
                 # ============================================================
                 # STEP 3: GENERATE - Answer query with playbook context
                 # ============================================================
+                # Pass the user's API key explicitly to ensure session isolation
                 g = generator(
                     prompt,
                     topk,
+                    api_key=st.session_state.api_key,  # User's API key
                     conversation_history=conversation_history
                 )
                 answer = g.get("answer", "")
@@ -273,7 +277,13 @@ with tab1:
                 # ============================================================
                 # STEP 4: REFLECT - Extract learnings from this turn
                 # ============================================================
-                bullets = reflector(prompt, answer, trace)
+                # Pass the user's API key explicitly
+                bullets = reflector(
+                    prompt,
+                    answer,
+                    trace,
+                    api_key=st.session_state.api_key  # User's API key
+                )
                 
                 # ============================================================
                 # STEP 5: CURATE - Merge new bullets into playbook

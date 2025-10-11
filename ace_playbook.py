@@ -263,48 +263,52 @@ def _faiss_topk(k: int = 8, query: Optional[str] = None) -> List[Dict]:
 # ============================================================================
 # LLM Components - Generator and Reflector
 # ============================================================================
-# Lazy initialization of LLM instances to support runtime API key configuration
-# This prevents errors when the module is imported before API key is set
+# LLM instances are created per-call with the API key to ensure session isolation
+# This prevents API key leakage between different users/sessions
 
-_llm_gen = None  # Generator LLM instance (cached)
-_llm_ref = None  # Reflector LLM instance (cached)
-
-
-def _get_llm_gen():
+def _get_llm_gen(api_key: str):
     """
-    Lazy initialization of Generator LLM.
+    Create a Generator LLM instance with the provided API key.
+    
+    Args:
+        api_key: OpenAI API key for this specific session/user
     
     Returns:
         ChatOpenAI instance configured for generation tasks
     
     Implementation Notes:
-        - Only creates the LLM instance on first use
-        - Allows API key to be set at runtime (e.g., via frontend input)
+        - Creates a NEW instance each time (no caching)
+        - This ensures each user's API key is isolated
         - Uses gpt-4o-mini for cost efficiency
         - Temperature=0 for consistent, deterministic responses
+    
+    Security:
+        - API key is passed explicitly, not from environment
+        - Prevents key leakage between concurrent sessions
     """
-    global _llm_gen
-    if _llm_gen is None:
-        _llm_gen = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    return _llm_gen
+    return ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
 
 
-def _get_llm_ref():
+def _get_llm_ref(api_key: str):
     """
-    Lazy initialization of Reflector LLM.
+    Create a Reflector LLM instance with the provided API key.
+    
+    Args:
+        api_key: OpenAI API key for this specific session/user
     
     Returns:
         ChatOpenAI instance configured for reflection tasks
     
     Implementation Notes:
-        - Separate instance from Generator (could use different models/params)
-        - Currently uses same model (gpt-4o-mini) but architecture supports
-          using different models for different roles
+        - Creates a NEW instance each time (no caching)
+        - Separate from Generator (could use different models/params)
+        - Currently uses same model but architecture supports variety
+    
+    Security:
+        - API key is passed explicitly per session
+        - No global state that could leak between users
     """
-    global _llm_ref
-    if _llm_ref is None:
-        _llm_ref = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    return _llm_ref
+    return ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
 
 
 def build_playbook_block(topk: List[Dict]) -> str:
@@ -334,7 +338,226 @@ def build_playbook_block(topk: List[Dict]) -> str:
     return f"### ACE Playbook (Top-K)\n{lines}\n"
 
 
-def generator(user_query: str, topk: List[Dict], conversation_history: Optional[List[Dict]] = None) -> Dict:
+def generator(user_query: str, topk: List[Dict], api_key: str, conversation_history: Optional[List[Dict]] = None) -> Dict:
+    """
+    GENERATOR: Answer user queries using playbook context and conversation history.
+    
+    Args:
+        user_query: The current user question/task
+        topk: Top-K retrieved bullets to use as context
+        api_key: OpenAI API key for this session (required for security)
+        conversation_history: Previous messages in the conversation
+    
+    Returns:
+        Dictionary with:
+        - answer: The LLM's response (string)
+        - trace: List of reasoning steps taken
+    
+    ACE Framework Context:
+        This is the GENERATOR component from the paper. It:
+        1. Receives retrieved playbook bullets (Top-K)
+        2. Incorporates conversation history for continuity
+        3. Uses the playbook as "guidelines" to inform its response
+        4. Returns both the answer and a trace of its reasoning
+    
+    Security:
+        - API key is passed explicitly per call
+        - No global caching that could leak keys between sessions
+        - Each user's LLM instance is isolated
+    
+    Workflow:
+        1. Build system message with playbook bullets injected
+        2. Add conversation history to maintain context
+        3. Add current user query
+        4. Invoke LLM to generate response
+        5. Parse JSON response (with error handling)
+        6. Return structured output
+    
+    JSON Response Format:
+        {
+          "answer": "The helpful response as a string",
+          "trace": ["step 1", "step 2", "step 3"]
+        }
+    
+    Implementation Notes:
+        - Explicitly requires JSON output to enable structured parsing
+        - Maintains full conversation context (not just last message)
+        - Handles edge cases where LLM returns invalid JSON
+        - Converts non-string answers to strings (e.g., bare numbers)
+    """
+    # System message with instructions and playbook context
+    system_msg = (
+        "You are the GENERATOR - an AI assistant that helps users with their tasks.\n"
+        "Use the ACE Playbook if relevant.\n"
+        "Maintain conversation context and refer to previous messages when appropriate.\n\n"
+        "IMPORTANT: You MUST respond ONLY with valid JSON in this exact format:\n"
+        "{\n"
+        '  "answer": "your helpful response here as a string",\n'
+        '  "trace": ["step 1", "step 2", "step 3"]\n'
+        "}\n\n"
+        "Do not include any text before or after the JSON.\n"
+        "The answer field must be a string, even for numerical results.\n"
+        "Example for math: {\"answer\": \"The result is 42\", \"trace\": [\"Added 15 + 27\"]}"
+    )
+    ctx = build_playbook_block(topk)
+    
+    llm_gen = _get_llm_gen(api_key)  # Create LLM with user's API key
+    
+    # Build complete message history for the LLM
+    messages = [("system", system_msg + "\n\n" + ctx)]
+    
+    # Add previous conversation turns
+    if conversation_history:
+        for msg in conversation_history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "user":
+                messages.append(("user", content))
+            elif role == "assistant":
+                # For assistant messages, only include the text content
+                # (not the original JSON structure with trace)
+                messages.append(("assistant", content))
+    
+    # Add the current user query
+    messages.append(("user", user_query))
+    
+    # Invoke the LLM
+    res = llm_gen.invoke(messages).content
+    
+    # Clean up response - remove markdown code blocks if LLM wrapped the JSON
+    res = res.strip()
+    if res.startswith("```json"):
+        res = res[7:]
+    if res.startswith("```"):
+        res = res[3:]
+    if res.endswith("```"):
+        res = res[:-3]
+    res = res.strip()
+    
+    # Parse JSON with error handling
+    try:
+        parsed = json.loads(res)
+        
+        # Ensure answer is always a string (convert numbers if needed)
+        if "answer" in parsed and not isinstance(parsed["answer"], str):
+            parsed["answer"] = str(parsed["answer"])
+        
+        # Ensure trace exists (default to empty array)
+        if "trace" not in parsed:
+            parsed["trace"] = []
+        
+        return parsed
+    except json.JSONDecodeError as e:
+        # Fallback: if JSON parsing fails, wrap the raw response
+        # This prevents crashes and allows the conversation to continue
+        return {
+            "answer": res,
+            "trace": [f"Raw response (JSON parse failed): {str(e)}"]
+        }
+
+
+def reflector(user_query: str, answer: str, trace: List[str], api_key: str) -> List[Dict]:
+    """
+    REFLECTOR: Extract learnings from a conversation turn into playbook bullets.
+    
+    Args:
+        user_query: The user's original question/task
+        answer: The generated answer from the Generator
+        trace: The reasoning steps from the Generator
+        api_key: OpenAI API key for this session (required for security)
+    
+    Returns:
+        List of new bullet dictionaries, each containing:
+        - content: The learning/strategy/pitfall text
+        - tags: List of category tags
+        - vote: "helpful" or "harmful"
+    
+    ACE Framework Context:
+        This is the REFLECTOR component from the paper. It:
+        1. Analyzes a completed conversation turn
+        2. Extracts reusable insights, strategies, and pitfalls
+        3. Returns 2-6 concise bullets that can be added to the playbook
+        4. Categorizes each bullet as "helpful" or "harmful"
+    
+    Security:
+        - API key is passed explicitly per call
+        - No shared state between sessions
+    
+    Purpose:
+        The Reflector enables the system to LEARN from interactions.
+        Over time, the playbook grows to include:
+        - Successful strategies ("helpful")
+        - Common pitfalls to avoid ("harmful")
+        - Domain-specific guidelines
+        - User preferences and patterns
+    
+    Workflow:
+        1. Package the query, answer, and trace into a JSON payload
+        2. Prompt the Reflector LLM to extract learnings
+        3. Parse the JSON response
+        4. Return bullets for the Curator to merge
+    
+    JSON Response Format:
+        {
+          "bullets": [
+            {
+              "content": "Strategy or learning text",
+              "tags": ["category1", "category2"],
+              "vote": "helpful"
+            },
+            ...
+          ]
+        }
+    
+    Implementation Notes:
+        - Returns empty list if extraction fails (graceful degradation)
+        - Handles malformed JSON responses
+        - Tags enable categorical organization of bullets
+        - Vote field enables ranking by community feedback analogy
+    """
+    system_msg = (
+        "You are the REFLECTOR.\n"
+        "Extract 2–6 concise, reusable bullets (strategy/pitfall/guardrail).\n\n"
+        "IMPORTANT: You MUST respond ONLY with valid JSON in this exact format:\n"
+        "{\n"
+        '  "bullets": [\n'
+        '    {"content": "bullet text here", "tags": ["tag1", "tag2"], "vote": "helpful"},\n'
+        '    {"content": "another bullet", "tags": ["tag3"], "vote": "harmful"}\n'
+        "  ]\n"
+        "}\n\n"
+        'vote must be either "helpful" or "harmful".\n'
+        "Do not include any text before or after the JSON."
+    )
+    
+    # Package the conversation turn for analysis
+    payload = json.dumps({
+        "query": user_query,
+        "answer": answer,
+        "trace": trace
+    }, indent=2)
+    
+    llm_ref = _get_llm_ref(api_key)  # Create LLM with user's API key
+    res = llm_ref.invoke([("system", system_msg), ("user", payload)]).content
+    
+    # Clean up response - remove markdown code blocks if present
+    res = res.strip()
+    if res.startswith("```json"):
+        res = res[7:]
+    if res.startswith("```"):
+        res = res[3:]
+    if res.endswith("```"):
+        res = res[:-3]
+    res = res.strip()
+    
+    # Parse JSON with error handling
+    try:
+        parsed = json.loads(res)
+        return parsed.get("bullets", [])
+    except json.JSONDecodeError as e:
+        # Fallback: return empty bullets if parsing fails
+        # This prevents the reflection step from breaking the entire flow
+        print(f"Reflector JSON parse error: {e}")
+        return []
     """
     GENERATOR: Answer user queries using playbook context and conversation history.
     
@@ -545,7 +768,7 @@ def reflector(user_query: str, answer: str, trace: List[str]) -> List[Dict]:
         return []
 
 
-def retriever_topk(k: int = 8, mode: str = "score", query: Optional[str] = None) -> List[Dict]:
+def retriever_topk(k: int = 8, mode: str = "score", query: Optional[str] = None, api_key: Optional[str] = None) -> List[Dict]:
     """
     RETRIEVER: Fetch top-K bullets from playbook using specified strategy.
     
@@ -553,6 +776,7 @@ def retriever_topk(k: int = 8, mode: str = "score", query: Optional[str] = None)
         k: Number of bullets to retrieve
         mode: Retrieval strategy - "score" or "faiss"
         query: User query (used for semantic search if mode="faiss")
+        api_key: OpenAI API key (required for FAISS mode)
     
     Returns:
         List of K bullets most relevant according to the chosen strategy
@@ -561,6 +785,10 @@ def retriever_topk(k: int = 8, mode: str = "score", query: Optional[str] = None)
         This is the RETRIEVER component from the paper. It selects which
         bullets from the playbook should be injected into the Generator's
         context for the current query.
+    
+    Security:
+        - API key is passed through to FAISS retrieval
+        - No global state that could leak between sessions
     
     Retrieval Strategies:
         1. "score": Rank by (helpful - harmful) score
@@ -579,7 +807,7 @@ def retriever_topk(k: int = 8, mode: str = "score", query: Optional[str] = None)
         - Future: BM25, keyword matching, temporal decay, etc.
     """
     if mode == "faiss":
-        return _faiss_topk(k=k, query=query)
+        return _faiss_topk(k=k, query=query, api_key=api_key)
     return get_topk_by_score(k=k)
 
 
