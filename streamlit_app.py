@@ -1,22 +1,71 @@
+"""
+ACE Streamlit Demo - Interactive Chat Interface
+
+This is the main Streamlit application that provides a web-based UI for the
+ACE (Adaptive Context Engine) framework. It implements a continuous chat
+interface where the system learns from conversations and builds a playbook
+of reusable knowledge.
+
+Application Architecture:
+    1. Chat Interface: User interacts via chat messages
+    2. ACE Pipeline: Each message triggers Retrieve → Generate → Reflect → Curate
+    3. Playbook Management: View, analyze, and manage accumulated learnings
+    4. Visualizations: Charts and graphs showing playbook growth and statistics
+
+Key Features:
+    - 💬 Continuous chat with full conversation context
+    - 🎯 Preview of context bullets sent to LLM
+    - 📚 Playbook browser with scoring and filtering
+    - 📊 Analytics dashboard with matplotlib visualizations
+    - 🔑 Secure API key input (session-only, not persisted)
+    - ⚙️ Configurable retrieval modes (score-based vs semantic)
+
+Session State Management:
+    - messages: List of all chat messages with metadata
+    - playbook_history: Timeline of bullet additions per turn
+    - api_key: OpenAI API key (session-scoped)
+
+ACE Loop Flow:
+    User Query → Retriever (get relevant bullets) → Generator (answer with context)
+    → Reflector (extract learnings) → Curator (merge to playbook) → Display
+"""
 
 import streamlit as st
 import json, os
 import matplotlib.pyplot as plt
 
+# ============================================================================
+# Page Configuration and Session State Initialization
+# ============================================================================
+
+# Configure the Streamlit page (must be first st command)
 st.set_page_config(page_title="ACE Context Demo", page_icon="🧠", layout="wide")
 
-# Initialize session state for chat history
+# Initialize session state variables for persistence across reruns
+# Streamlit reruns the entire script on each interaction, so we use
+# st.session_state to maintain data between runs
+
 if "messages" not in st.session_state:
+    # Chat history: list of {role: "user"|"assistant", content: str, metadata: dict}
     st.session_state.messages = []
+
 if "playbook_history" not in st.session_state:
+    # Timeline of playbook growth: list of {turn: int, bullets_added: int, total_bullets: int}
     st.session_state.playbook_history = []
+
 if "api_key" not in st.session_state:
+    # OpenAI API key from user input (session-scoped, not persisted to disk)
     st.session_state.api_key = ""
+
+# ============================================================================
+# Title and API Key Configuration
+# ============================================================================
 
 st.title("🧠 ACE Context Demo — Continuous Chat with Playbook")
 
 st.sidebar.header("🔑 API Key")
-# API Key input
+
+# API Key input field (password type hides the key)
 api_key_input = st.sidebar.text_input(
     "Enter your OpenAI API Key",
     type="password",
@@ -24,31 +73,66 @@ api_key_input = st.sidebar.text_input(
     help="Your API key will be used for this session only and is not stored permanently."
 )
 
+# If user enters a key, save it to session state and environment
 if api_key_input:
     st.session_state.api_key = api_key_input
     os.environ["OPENAI_API_KEY"] = api_key_input
     st.sidebar.success("✅ API Key set!")
 elif not os.environ.get("OPENAI_API_KEY"):
+    # Warn if no API key is available
     st.sidebar.warning("⚠️ Please enter your OpenAI API key to use the app.")
 
-# Import ace_playbook after API key is potentially set
+# ============================================================================
+# Import ACE Functions (after API key setup)
+# ============================================================================
+# Import after API key configuration to support runtime key entry
+# The ace_playbook module uses lazy LLM initialization, so it won't fail
+# if the API key isn't set yet (only fails when actually calling LLM)
+
 from ace_playbook import (
-    retriever_topk, generator, reflector, merge_deltas,
-    build_playbook_block, get_topk_by_score,
-    load_all_bullets, score, bullets_by_tag, daily_counts
+    retriever_topk,      # Retrieve top-K bullets from playbook
+    generator,           # Generate answers using playbook context
+    reflector,           # Extract learnings from conversations
+    merge_deltas,        # Merge new bullets into playbook (Curator)
+    build_playbook_block,# Format bullets for display
+    get_topk_by_score,   # Get bullets ranked by score
+    load_all_bullets,    # Load entire playbook
+    score,               # Calculate bullet score (helpful - harmful)
+    bullets_by_tag,      # Count bullets by tag
+    daily_counts         # Count bullets by date
 )
+
+# ============================================================================
+# Sidebar Configuration
+# ============================================================================
 
 st.sidebar.markdown("---")
 st.sidebar.header("Settings")
+
+# Top-K slider: how many bullets to retrieve for context
 k = st.sidebar.slider("Top‑K bullets", 1, 16, 8)
-retrieval_mode = st.sidebar.selectbox("Retrieval mode", ["score", "faiss"])
-query_for_faiss = st.sidebar.text_input("Semantic retrieval query (optional)", "")
+
+# Retrieval mode selector
+retrieval_mode = st.sidebar.selectbox(
+    "Retrieval mode",
+    ["score", "faiss"],
+    help="score: rank by helpful-harmful score | faiss: semantic similarity search"
+)
+
+# Optional query for semantic search
+query_for_faiss = st.sidebar.text_input(
+    "Semantic retrieval query (optional)",
+    help="Used only if retrieval mode is 'faiss'"
+)
 
 st.sidebar.markdown("---")
+
+# Display playbook statistics
 st.sidebar.write("**Playbook file**: `playbook.jsonl`")
 bullets_count = len(load_all_bullets())
 st.sidebar.metric("Total Bullets", bullets_count)
 
+# Reset playbook button
 if st.sidebar.button("Reset Playbook"):
     if os.path.exists("playbook.jsonl"):
         os.remove("playbook.jsonl")
@@ -56,89 +140,162 @@ if st.sidebar.button("Reset Playbook"):
     st.success("Playbook reset.")
     st.rerun()
 
+# Clear chat history button
 if st.sidebar.button("Clear Chat History"):
     st.session_state.messages = []
     st.success("Chat history cleared.")
     st.rerun()
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "🎯 Context Preview", "📚 Playbook", "📊 Visualizations", "ℹ️ About"])
+# ============================================================================
+# Tab-based Navigation
+# ============================================================================
+# Organize the UI into multiple tabs for different views
 
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "💬 Chat",
+    "🎯 Context Preview",
+    "📚 Playbook",
+    "📊 Visualizations",
+    "ℹ️ About"
+])
 
+# ============================================================================
+# TAB 1: Chat Interface
+# ============================================================================
 with tab1:
+    """
+    Continuous Chat Tab
+    
+    This tab provides the main conversational interface. Users can:
+    - Send messages to the AI assistant
+    - View conversation history with full context
+    - Expand message details to see:
+        * Top-K bullets that were used as context
+        * Reasoning trace from the Generator
+        * New bullets extracted by the Reflector
+    
+    ACE Pipeline Execution:
+    Each message triggers the full ACE loop:
+    1. RETRIEVE: Get top-K relevant bullets from playbook
+    2. GENERATE: Use bullets + conversation history to answer
+    3. REFLECT: Extract learnings from the interaction
+    4. CURATE: Merge new bullets into playbook
+    """
     st.subheader("💬 Continuous Chat")
     
-    # Create a container for chat messages with a fixed height
+    # Create a container for chat messages
+    # This allows for scrolling while keeping input at bottom
     chat_container = st.container()
     
-    # Chat input at the bottom
+    # Chat input at the bottom (stays fixed)
     prompt = st.chat_input("Ask a question or give a task...")
     
     # Display chat history in the container
     with chat_container:
         for msg in st.session_state.messages:
+            # Use Streamlit's chat_message component for nice formatting
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
+                
+                # Show expandable details for assistant messages
                 if "metadata" in msg and msg["metadata"]:
                     with st.expander("🔍 View Details"):
+                        # Show which bullets were used as context
                         if "topk" in msg["metadata"]:
                             st.caption("**Top-K Bullets Used:**")
-                            st.code(build_playbook_block(msg["metadata"]["topk"]) or "(none)", language="markdown")
+                            st.code(
+                                build_playbook_block(msg["metadata"]["topk"]) or "(none)",
+                                language="markdown"
+                            )
+                        
+                        # Show the reasoning trace
                         if "trace" in msg["metadata"]:
                             st.caption("**Trace:**")
                             st.json(msg["metadata"]["trace"])
+                        
+                        # Show new bullets extracted from this turn
                         if "bullets" in msg["metadata"]:
                             st.caption("**New Bullets Extracted:**")
                             st.json(msg["metadata"]["bullets"])
     
-    # Process the prompt if submitted
+    # ========================================================================
+    # Process User Input (ACE Pipeline)
+    # ========================================================================
     if prompt:
-        # Check if API key is set
+        # Validation: Check if API key is set
         if not st.session_state.api_key and not os.environ.get("OPENAI_API_KEY"):
             st.error("❌ Please enter your OpenAI API key in the sidebar first!")
             st.stop()
         
-        # Add user message to chat
+        # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         
-        # Process with ACE
+        # Execute the ACE pipeline
         with st.spinner("🧠 Thinking..."):
             try:
-                # Retrieve Top-K
-                topk = retriever_topk(k=k, mode=retrieval_mode, query=query_for_faiss or prompt)
+                # ============================================================
+                # STEP 1: RETRIEVE - Get relevant bullets from playbook
+                # ============================================================
+                topk = retriever_topk(
+                    k=k,
+                    mode=retrieval_mode,
+                    query=query_for_faiss or prompt
+                )
                 
-                # Prepare conversation history (exclude metadata for cleaner context)
+                # ============================================================
+                # STEP 2: Prepare conversation history
+                # ============================================================
+                # Extract just role and content (exclude metadata)
+                # Exclude the current message we just added (it will be added
+                # separately in the generator function)
                 conversation_history = [
                     {"role": msg["role"], "content": msg["content"]} 
-                    for msg in st.session_state.messages[:-1]  # Exclude the current message we just added
+                    for msg in st.session_state.messages[:-1]
                 ]
                 
-                # Generate with conversation context
-                g = generator(prompt, topk, conversation_history=conversation_history)
+                # ============================================================
+                # STEP 3: GENERATE - Answer query with playbook context
+                # ============================================================
+                g = generator(
+                    prompt,
+                    topk,
+                    conversation_history=conversation_history
+                )
                 answer = g.get("answer", "")
                 trace = g.get("trace", [])
                 
-                # Reflect and extract bullets
+                # ============================================================
+                # STEP 4: REFLECT - Extract learnings from this turn
+                # ============================================================
                 bullets = reflector(prompt, answer, trace)
                 
-                # Curate/merge into playbook
+                # ============================================================
+                # STEP 5: CURATE - Merge new bullets into playbook
+                # ============================================================
                 updated_topk = merge_deltas(bullets)
                 
-                # Store metadata
+                # ============================================================
+                # Store metadata for this turn
+                # ============================================================
                 metadata = {
-                    "topk": topk,
-                    "trace": trace,
-                    "bullets": bullets,
-                    "updated_topk": updated_topk
+                    "topk": topk,              # Bullets used as input
+                    "trace": trace,            # Reasoning steps
+                    "bullets": bullets,        # New bullets extracted
+                    "updated_topk": updated_topk  # Updated playbook state
                 }
                 
-                # Add assistant message to chat
+                # ============================================================
+                # Add assistant response to chat history
+                # ============================================================
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": answer,
                     "metadata": metadata
                 })
                 
-                # Track playbook growth
+                # ============================================================
+                # Track playbook growth for analytics
+                # ============================================================
                 st.session_state.playbook_history.append({
                     "turn": len(st.session_state.messages) // 2,
                     "bullets_added": len(bullets),
@@ -149,6 +306,7 @@ with tab1:
                 st.rerun()
                 
             except Exception as e:
+                # Handle errors gracefully
                 error_msg = f"❌ Error: {str(e)}"
                 st.session_state.messages.append({
                     "role": "assistant",
@@ -157,15 +315,22 @@ with tab1:
                 })
                 st.rerun()
     
-    # Show quick stats
+    # ========================================================================
+    # Chat Statistics Sidebar
+    # ========================================================================
     if st.session_state.messages:
         st.sidebar.markdown("---")
         st.sidebar.subheader("💬 Chat Stats")
         st.sidebar.metric("Total Messages", len(st.session_state.messages))
-        st.sidebar.metric("User Messages", len([m for m in st.session_state.messages if m["role"] == "user"]))
+        st.sidebar.metric(
+            "User Messages",
+            len([m for m in st.session_state.messages if m["role"] == "user"])
+        )
         
         if st.session_state.playbook_history:
-            total_bullets_added = sum(h["bullets_added"] for h in st.session_state.playbook_history)
+            total_bullets_added = sum(
+                h["bullets_added"] for h in st.session_state.playbook_history
+            )
             st.sidebar.metric("Bullets Added This Session", total_bullets_added)
 
 
