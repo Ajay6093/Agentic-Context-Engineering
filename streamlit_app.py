@@ -61,7 +61,7 @@ if st.sidebar.button("Clear Chat History"):
     st.success("Chat history cleared.")
     st.rerun()
 
-tab1, tab2, tab3, tab4 = st.tabs(["💬 Chat", "📚 Playbook", "📊 Visualizations", "ℹ️ About"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "🎯 Context Preview", "📚 Playbook", "📊 Visualizations", "ℹ️ About"])
 
 
 with tab1:
@@ -173,6 +173,90 @@ with tab1:
 
 
 with tab2:
+    st.subheader("🎯 Context Preview — Next Prompt")
+    
+    st.markdown("""
+    This shows the **Top-K bullets** that will be injected as context into the next prompt.
+    These bullets guide the Generator's response based on accumulated knowledge.
+    """)
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        preview_k = st.slider("Preview Top-K", 1, 20, k, key="preview_k")
+    with col2:
+        preview_mode = st.selectbox("Mode", ["score", "faiss"], index=0 if retrieval_mode == "score" else 1, key="preview_mode")
+    
+    preview_query = st.text_input("Preview query (for FAISS mode)", query_for_faiss, key="preview_query")
+    
+    if st.button("🔄 Refresh Preview", help="Update the preview with current settings"):
+        st.rerun()
+    
+    # Get the bullets that would be used for the next prompt
+    try:
+        preview_topk = retriever_topk(k=preview_k, mode=preview_mode, query=preview_query if preview_mode == "faiss" else None)
+        
+        if not preview_topk:
+            st.info("📭 No bullets in playbook yet. Start chatting to build context!")
+        else:
+            # Show count and stats
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Bullets to Inject", len(preview_topk))
+            with col2:
+                avg_score = sum(score(b) for b in preview_topk) / len(preview_topk) if preview_topk else 0
+                st.metric("Average Score", f"{avg_score:.2f}")
+            with col3:
+                total_helpful = sum(b.get("helpful", 0) for b in preview_topk)
+                total_harmful = sum(b.get("harmful", 0) for b in preview_topk)
+                st.metric("Total 👍/👎", f"{total_helpful}/{total_harmful}")
+            
+            st.markdown("---")
+            
+            # Show the formatted context block (as it will appear to the LLM)
+            st.subheader("📋 Context Block (as sent to LLM)")
+            context_block = build_playbook_block(preview_topk)
+            st.code(context_block, language="markdown")
+            
+            st.markdown("---")
+            
+            # Show detailed bullet breakdown
+            st.subheader("🔍 Detailed Bullet Breakdown")
+            
+            for i, bullet in enumerate(preview_topk, 1):
+                bullet_score = score(bullet)
+                helpful = bullet.get("helpful", 0)
+                harmful = bullet.get("harmful", 0)
+                tags = bullet.get("tags", [])
+                content = bullet.get("content", "")
+                last_seen = bullet.get("last_seen", "N/A")
+                
+                # Color code by score
+                if bullet_score > 5:
+                    emoji = "🟢"
+                elif bullet_score > 0:
+                    emoji = "🟡"
+                elif bullet_score == 0:
+                    emoji = "⚪"
+                else:
+                    emoji = "🔴"
+                
+                with st.expander(f"{emoji} **Bullet #{i}** — Score: {bullet_score} | 👍 {helpful} | 👎 {harmful}"):
+                    st.markdown(f"**Content:** {content}")
+                    if tags:
+                        st.markdown(f"**Tags:** {', '.join(tags)}")
+                    st.caption(f"Last seen: {last_seen}")
+                    
+                    # Show relevance indicator
+                    if bullet_score > 3:
+                        st.success("✨ High-value bullet - frequently helpful")
+                    elif bullet_score < 0:
+                        st.warning("⚠️ Potentially harmful - use with caution")
+    
+    except Exception as e:
+        st.error(f"Error loading preview: {str(e)}")
+
+
+with tab3:
     st.subheader("📚 Playbook View")
     
     bullets = load_all_bullets()
@@ -235,8 +319,8 @@ with tab2:
             plt.grid(True, alpha=0.3)
             st.pyplot(fig, clear_figure=True)
 
-with tab3:
-    st.subheader("Visualizations")
+with tab4:
+    st.subheader("📊 Visualizations")
 
     bullets = load_all_bullets()
     if not bullets:
@@ -294,7 +378,7 @@ with tab3:
         else:
             st.caption("No last_seen timestamps yet.")
 
-with tab4:
+with tab5:
     st.markdown("""
 ## 🧠 ACE Context Demo — Continuous Chat
 
@@ -308,10 +392,18 @@ with tab4:
 
 **Features**
 - 💬 **Continuous Chat**: Chat history persists during your session
+- 🎯 **Context Preview**: See exactly which bullets will be sent with the next prompt
 - 📚 **Live Playbook**: See bullets grow with each interaction
 - 📊 **Visualizations**: Track playbook statistics and growth
 - 🔍 **Expandable Details**: View Top-K bullets, traces, and new bullets for each turn
 - ⚙️ **Configurable**: Adjust Top-K size, retrieval mode (score/FAISS)
+
+**Tabs**
+- **💬 Chat**: Interactive conversation with the ACE agent
+- **🎯 Context Preview**: Preview the Top-K bullets that will be injected into the next prompt
+- **📚 Playbook**: Browse all bullets, sorted by score
+- **📊 Visualizations**: Charts showing playbook statistics and growth
+- **ℹ️ About**: This information page
 
 **Visualizations**
 - Top bullets by score
@@ -322,14 +414,14 @@ with tab4:
 
 **Tips**
 - Start chatting to build your playbook from scratch
+- Use the **Context Preview** tab to see what knowledge will guide the next response
 - Use the sidebar to adjust Top-K and retrieval settings
 - Click "View Details" on any message to see the ACE pipeline in action
 - Reset the playbook to start fresh, or clear chat history to begin a new session
 
 **Environment**
-- Model: `gpt-4.1-mini`
-- API Key: Loaded from Streamlit secrets or environment variable
+- Model: `gpt-4o-mini`
+- API Key: Enter via sidebar, or loaded from Streamlit secrets/environment variable
 
 > Built with Streamlit, LangChain, OpenAI, and matplotlib
 """)
-
