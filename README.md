@@ -16,10 +16,29 @@ and optional **FAISS**-based semantic retrieval for Top‑K bullets.
 ```bash
 python -m venv .venv && source .venv/bin/activate   # (Windows: .venv\Scripts\activate)
 pip install -r requirements.txt
+```
 
-# set your key
+### Setting up your OpenAI API Key
+
+**Option 1: Environment Variable (Local Development)**
+```bash
 export OPENAI_API_KEY=sk-...      # (Windows PowerShell: $env:OPENAI_API_KEY="sk-...")
+```
 
+**Option 2: Streamlit Secrets (Recommended for Deployment)**
+
+Create `.streamlit/secrets.toml` and add:
+```toml
+OPENAI_API_KEY = "sk-your-api-key-here"
+```
+
+⚠️ **Important:** Never commit your API key to git! The `.gitignore` file already excludes `secrets.toml`.
+
+For **Streamlit Cloud**, add your secrets in the app dashboard under "Settings" → "Secrets".
+
+### Run the app
+
+```bash
 streamlit run streamlit_app.py
 ```
 

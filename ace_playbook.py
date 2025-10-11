@@ -5,6 +5,14 @@ from dataclasses import dataclass
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
+# Load API key from Streamlit secrets or environment
+try:
+    import streamlit as st
+    if "OPENAI_API_KEY" in st.secrets:
+        os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+except Exception:
+    pass  # Fall back to environment variable
+
 # -------- Storage (JSONL) --------
 PLAYBOOK_PATH = "playbook.jsonl"
 

@@ -37,7 +37,7 @@ with tab1:
         st.code(build_playbook_block(topk) or "(none yet)", language="markdown")
     with colB:
         st.caption("Environment")
-        st.write("Model: `gpt-4.1-mini` (set `OPENAI_API_KEY`).")
+        st.write("Model: `gpt-4.1-mini` (API key loaded from secrets/environment).")
 
     if st.button("Run Generator ➜ Reflector ➜ Curator"):
         try:
