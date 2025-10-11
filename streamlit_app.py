@@ -16,9 +16,28 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "playbook_history" not in st.session_state:
     st.session_state.playbook_history = []
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
 
 st.title("🧠 ACE Context Demo — Continuous Chat with Playbook")
 
+st.sidebar.header("🔑 API Key")
+# API Key input
+api_key_input = st.sidebar.text_input(
+    "Enter your OpenAI API Key",
+    type="password",
+    value=st.session_state.api_key,
+    help="Your API key will be used for this session only and is not stored permanently."
+)
+
+if api_key_input:
+    st.session_state.api_key = api_key_input
+    os.environ["OPENAI_API_KEY"] = api_key_input
+    st.sidebar.success("✅ API Key set!")
+elif not os.environ.get("OPENAI_API_KEY"):
+    st.sidebar.warning("⚠️ Please enter your OpenAI API key to use the app.")
+
+st.sidebar.markdown("---")
 st.sidebar.header("Settings")
 k = st.sidebar.slider("Top‑K bullets", 1, 16, 8)
 retrieval_mode = st.sidebar.selectbox("Retrieval mode", ["score", "faiss"])
@@ -65,6 +84,11 @@ with tab1:
     
     # Chat input
     if prompt := st.chat_input("Ask a question or give a task..."):
+        # Check if API key is set
+        if not st.session_state.api_key and not os.environ.get("OPENAI_API_KEY"):
+            st.error("❌ Please enter your OpenAI API key in the sidebar first!")
+            st.stop()
+        
         # Add user message to chat
         st.session_state.messages.append({"role": "user", "content": prompt})
         

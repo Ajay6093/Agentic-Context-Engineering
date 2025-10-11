@@ -25,12 +25,19 @@ pip install -r requirements.txt
 
 ### Setting up your OpenAI API Key
 
-**Option 1: Environment Variable (Local Development)**
+You have three options:
+
+**Option 1: Enter in the App (Easiest - Recommended for First Time Users)**
+- Run the app with `streamlit run streamlit_app.py`
+- Enter your API key in the sidebar password field
+- The key is only stored for your session and is not saved permanently
+
+**Option 2: Environment Variable (Local Development)**
 ```bash
 export OPENAI_API_KEY=sk-...      # (Windows PowerShell: $env:OPENAI_API_KEY="sk-...")
 ```
 
-**Option 2: Streamlit Secrets (Recommended for Deployment)**
+**Option 3: Streamlit Secrets (Recommended for Deployment)**
 
 Create `.streamlit/secrets.toml` and add:
 ```toml
