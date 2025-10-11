@@ -1,15 +1,20 @@
 
-# ACE Context (Retriever → Reflector → Curator) — Streamlit Demo
+# ACE Context Demo — Continuous Chat with Playbook
 
-This demo shows a simple **ACE** loop with a JSONL Playbook, a **Streamlit** UI,
-and optional **FAISS**-based semantic retrieval for Top‑K bullets.
+This demo shows a **continuous chat interface** with an **ACE** (Adaptive Context Engine) loop that builds a JSONL Playbook dynamically as you interact with it. Features include:
+- 💬 **Continuous chat** with conversation history
+- 📚 **Live playbook** that grows with each interaction
+- 📊 **Real-time visualizations** of playbook statistics
+- 🔍 **Detailed trace views** for each ACE pipeline run
 
 ## Features
-- View Playbook bullets (JSONL)
-- Run a "Generator" turn (uses OpenAI chat model) with **Top‑K** bullets injected
-- Reflect on the run to extract new bullets
-- Curate/merge bullets with dedup and helpful/harmful counters
-- **Optional:** enable FAISS semantic retrieval for Top‑K selection
+- **Chat Interface**: Natural conversation with the AI assistant
+- **Dynamic Playbook**: Automatically extracts and stores reusable bullets (strategies, pitfalls, guardrails)
+- **Retrieval Modes**: Score-based or FAISS semantic retrieval for Top-K bullets
+- **Reflection**: Each turn generates new insights that enrich the playbook
+- **Curation**: Automatic deduplication and ranking of bullets by helpful/harmful votes
+- **Visualizations**: Track playbook growth, tag frequencies, and helpful/harmful ratios
+
 
 ## Quickstart
 
@@ -46,8 +51,22 @@ Open the URL shown by Streamlit (usually http://localhost:8501).
 
 ## Files
 - `ace_playbook.py` — Playbook store, FAISS retriever, generator/reflector/curator functions
-- `streamlit_app.py` — UI to run a turn and manage bullets
+- `streamlit_app.py` — Continuous chat UI with live playbook visualization
 - `requirements.txt` — dependencies
+- `.streamlit/secrets.toml` — (create this) for your OpenAI API key
+
+## How It Works
+
+### The ACE Loop
+1. **User Input**: You chat with the assistant
+2. **Retriever**: Gets Top-K most relevant bullets from the playbook
+3. **Generator**: Uses OpenAI to answer your query, informed by the Top-K bullets
+4. **Reflector**: Analyzes the interaction and extracts 2-6 reusable bullets
+5. **Curator**: Merges new bullets into the playbook, deduplicates, and ranks by score
+
+### Continuous Learning
+Each chat turn enriches the playbook. Over time, the system builds up a knowledge base of strategies, pitfalls, and guardrails specific to your domain and usage patterns.
+
 
 ## Notes
 - The demo writes/reads `playbook.jsonl` in the current directory.
