@@ -73,13 +73,19 @@ api_key_input = st.sidebar.text_input(
     help="Your API key will be used for this session only and is not stored permanently."
 )
 
-# If user enters a key, save it to session state and environment
+# Handle API key configuration
+# Priority: Input box > Nothing (user must provide)
 if api_key_input:
+    # User provided a key in the input box - use it
     st.session_state.api_key = api_key_input
+    # Set environment variable for the LLM to use
     os.environ["OPENAI_API_KEY"] = api_key_input
     st.sidebar.success("✅ API Key set!")
-elif not os.environ.get("OPENAI_API_KEY"):
-    # Warn if no API key is available
+else:
+    # No key provided in input box
+    # Clear any existing environment variable to prevent using old/invalid keys
+    if "OPENAI_API_KEY" in os.environ:
+        del os.environ["OPENAI_API_KEY"]
     st.sidebar.warning("⚠️ Please enter your OpenAI API key to use the app.")
 
 # ============================================================================

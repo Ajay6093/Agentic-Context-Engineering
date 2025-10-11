@@ -25,17 +25,12 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 # ============================================================================
 # API Key Configuration
 # ============================================================================
-# Load API key from Streamlit secrets or environment variable
-# This allows the app to work in multiple deployment scenarios:
-# 1. Streamlit Cloud with secrets configured
-# 2. Local development with environment variables
-# 3. Frontend password input (sets environment variable at runtime)
-try:
-    import streamlit as st
-    if "OPENAI_API_KEY" in st.secrets:
-        os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
-except Exception:
-    pass  # Fall back to environment variable
+# API key is set by the Streamlit app via the password input box
+# The app sets os.environ["OPENAI_API_KEY"] before importing this module
+# No automatic loading from secrets to ensure user has full control
+# 
+# Note: This module does NOT automatically load from st.secrets
+# The Streamlit app handles API key configuration explicitly
 
 
 # ============================================================================

@@ -25,28 +25,30 @@ pip install -r requirements.txt
 
 ### Setting up your OpenAI API Key
 
-You have three options:
+**Required: Enter your API key in the app's sidebar**
 
-**Option 1: Enter in the App (Easiest - Recommended for First Time Users)**
-- Run the app with `streamlit run streamlit_app.py`
-- Enter your API key in the sidebar password field
-- The key is only stored for your session and is not saved permanently
+When you run the app, you'll see a password input field in the sidebar. Simply enter your OpenAI API key there. The key is:
+- ✅ Only stored for your current session
+- ✅ Not saved to disk or committed to git
+- ✅ Cleared when you close the browser/tab
 
-**Option 2: Environment Variable (Local Development)**
+**Alternative: Environment Variable (Advanced)**
+
+For development, you can set an environment variable before running:
 ```bash
-export OPENAI_API_KEY=sk-...      # (Windows PowerShell: $env:OPENAI_API_KEY="sk-...")
+export OPENAI_API_KEY=sk-your-key-here  # Linux/Mac
+# OR
+$env:OPENAI_API_KEY="sk-your-key-here"  # Windows PowerShell
 ```
 
-**Option 3: Streamlit Secrets (Recommended for Deployment)**
+**For Streamlit Cloud Deployment:**
 
-Create `.streamlit/secrets.toml` and add:
+Add your API key in the Streamlit Cloud dashboard under "Settings" → "Secrets":
 ```toml
-OPENAI_API_KEY = "sk-your-api-key-here"
+OPENAI_API_KEY = "sk-your-actual-api-key"
 ```
 
-⚠️ **Important:** Never commit your API key to git! The `.gitignore` file already excludes `secrets.toml`.
-
-For **Streamlit Cloud**, add your secrets in the app dashboard under "Settings" → "Secrets".
+⚠️ **Important:** Never commit your API key to git!
 
 ### Run the app
 
